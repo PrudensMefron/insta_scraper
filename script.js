@@ -73,7 +73,7 @@ async function instagramScraper(usernames, webhook) {
 
     // Itera sobre os usernames para acessar os perfis
     for (const username of usernames) {
-      const cleanUsername = username.replace("@", "");
+      const cleanUsername = username.replace(/[@\s%20]/g, "");
       const profileUrl = `https://instagram.com/${cleanUsername}`;
       console.log(`Navegando para ${profileUrl}`);
       await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 }); // Aumenta o timeout para 60 segundos
