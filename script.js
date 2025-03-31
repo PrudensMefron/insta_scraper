@@ -27,19 +27,15 @@ async function instagramScraper(usernames, webhook) {
       console.log("Interceptou response GraphQL:", url);
       try {
         const data = await response.json();
-
-        // Verifica se os dados contém as informações do usuário
         if (data?.data?.user && data.data.user.username && data.data.user.id) {
           const userFromResponse = data.data.user.username.toLowerCase();
           const userId = data.data.user.id;
-
-          // Percorre os usernames que queremos obter
           for (let username of usernames) {
             const cleanUsername = username.replace("@", "").toLowerCase();
-            // Se o username bater e ainda não foi processado
-            if (cleanUsername === userFromResponse && !processedUsernames[cleanUsername]) {
+            // Envia apenas se ainda não foi processado (undefined)
+            if (cleanUsername === userFromResponse && processedUsernames[cleanUsername] === undefined) {
               console.log(`Encontrado ${username} com ID ${userId}`);
-              processedUsernames[cleanUsername] = true;
+              processedUsernames[cleanUsername] = userId; // Marca como encontrado
               try {
                 await axios.post(webhook, { username, id: userId, found: true });
                 console.log(`Webhook enviado para ${username}`);
@@ -68,7 +64,7 @@ async function instagramScraper(usernames, webhook) {
       await page.waitForSelector(passwordSelector, { timeout: 5000 });
       await page.type(passwordSelector, process.env.INSTA_PASS, { delay: 0 });
       await page.click('button[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }); // Aumenta o timeout para 60 segundos
+      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }); // Aumenta o timeout para 60 segundos
     }
 
     // Itera sobre os usernames para acessar os perfis
@@ -77,22 +73,14 @@ async function instagramScraper(usernames, webhook) {
       const profileUrl = `https://instagram.com/${cleanUsername}`;
       console.log(`Navegando para ${profileUrl}`);
 
-      let requestFound = false; // Flag para verificar se a request foi encontrada
-
       try {
-        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 }); // Aumenta o timeout para 60 segundos
-        // Aguarda um tempo para garantir que as requisições sejam disparadas
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // Aguarda 10 segundos para que as requisições sejam disparadas
+        await new Promise(resolve => setTimeout(resolve, 10000));
 
-        // Verifica se o username foi processado (indica que a request foi encontrada)
-        if (processedUsernames[cleanUsername]) {
-          requestFound = true;
-        }
-      } catch (error) {
-        console.error(`Erro ao navegar para o perfil de ${username}:`, error.message);
-      } finally {
-        // Se a request não foi encontrada, envia o webhook com id: null e found: false
-        if (!requestFound) {
+        // Se após aguardar 10s o usuário ainda não foi marcado, envia o webhook de falha
+        if (processedUsernames[cleanUsername] === undefined) {
+          processedUsernames[cleanUsername] = "notFound";
           try {
             await axios.post(webhook, { username, id: null, found: false });
             console.log(`Webhook enviado para ${username} com id: null e found: false`);
@@ -100,9 +88,21 @@ async function instagramScraper(usernames, webhook) {
             console.error(`Erro ao enviar webhook para ${username} com id: null:`, error.message);
           }
         }
+      } catch (error) {
+        console.error(`Erro ao navegar para o perfil de ${username}:`, error.message);
+        // Em caso de erro na navegação, se ainda não estiver marcado, envia o webhook de falha.
+        if (processedUsernames[cleanUsername] === undefined) {
+          processedUsernames[cleanUsername] = "notFound";
+          try {
+            await axios.post(webhook, { username, id: null, found: false });
+            console.log(`Webhook enviado para ${username} com id: null e found: false`);
+          } catch (err) {
+            console.error(`Erro ao enviar webhook para ${username} com id: null:`, err.message);
+          }
+        }
       }
 
-      // Adiciona um atraso de 10 segundos antes de processar o próximo username
+      // Atraso de 10 segundos antes de processar o próximo username
       await new Promise(resolve => setTimeout(resolve, 10000));
     }
   } catch (error) {
