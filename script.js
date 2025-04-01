@@ -64,8 +64,21 @@ async function instagramScraper(usernames, webhook) {
       await page.waitForSelector(passwordSelector, { timeout: 5000 });
       await page.type(passwordSelector, process.env.INSTA_PASS, { delay: 0 });
       await page.click('button[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }); // Aumenta o timeout para 60 segundos
+      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120000 }); // Aumenta o timeout para 120 segundos
     }
+
+    // Aguarda obrigatoriamente 3 minutos antes de iniciar o loop
+    console.log('Aguardando 3 minutos antes de iniciar o processamento dos usernames...');
+    for (const time of [180000, 120000, 60000, 30000, 10000]) {
+      await new Promise(resolve => setTimeout(resolve, time === 10000 ? 20000 : time - (time - 10000))); // Ajusta os intervalos
+      const message = time === 180000 ? 'Faltam 3 minutos...' :
+                      time === 120000 ? 'Faltam 2 minutos...' :
+                      time === 60000 ? 'Faltam 1 minuto...' :
+                      time === 30000 ? 'Faltam 30 segundos...' :
+                      'Faltam 10 segundos...';
+      console.log(message);
+    }
+    console.log('Iniciando o processamento dos usernames...');
 
     // Itera sobre os usernames para acessar os perfis
     for (const username of usernames) {
