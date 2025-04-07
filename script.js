@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const axios = require('axios');
+const fs = require('fs');
 require('dotenv').config();
 
 async function instagramScraper(usernames, webhook) {
@@ -125,8 +126,41 @@ async function instagramScraper(usernames, webhook) {
   }
 }
 
-const data = require('./file.json');
-const usernames = data.map(item => item.instagram);
-const webhook = 'https://n8nlike.likemarketing.com.br/webhook/047b4bfc-9a21-403e-aa06-8381d2772c6f';
+async function fetchAndUpdateData(url, outputFile) {
+  // Verifica se o arquivo file.json existe e o deleta
+  if (fs.existsSync(outputFile)) {
+    console.log(`Arquivo ${outputFile} encontrado. Deletando...`);
+    fs.unlinkSync(outputFile);
+  }
 
-instagramScraper(usernames, webhook);
+  // Faz a requisição HTTP GET para obter os dados
+  console.log(`Fazendo requisição para ${url}...`);
+  try {
+    const response = await axios.get(url);
+    const data = response.data;
+
+    // Salva o JSON no arquivo file.json
+    console.log(`Salvando dados no arquivo ${outputFile}...`);
+    fs.writeFileSync(outputFile, JSON.stringify(data, null, 2));
+    console.log(`Dados salvos com sucesso no arquivo ${outputFile}.`);
+  } catch (error) {
+    console.error(`Erro ao fazer a requisição para ${url}:`, error.message);
+    process.exit(1); // Encerra o script em caso de erro
+  }
+}
+
+(async () => {
+  const dataUrl = 'https://n8nlike.likemarketing.com.br/webhook/dba4d410-6340-42ad-98b1-68b7200f5031'; // Substitua pelo URL real
+  const outputFile = './file.json';
+
+  // Atualiza os dados antes de iniciar o scraper
+  await fetchAndUpdateData(dataUrl, outputFile);
+
+  // Lê os dados atualizados do arquivo file.json
+  const data = require(outputFile);
+  const usernames = data.map(item => item.instagram);
+  const webhook = 'https://n8nlike.likemarketing.com.br/webhook/047b4bfc-9a21-403e-aa06-8381d2772c6f';
+
+  // Inicia o scraper com os dados atualizados
+  await instagramScraper(usernames, webhook);
+})();
